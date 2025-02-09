@@ -1,5 +1,6 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 
 void main() {
   runApp(const WhiteboardApp());
@@ -28,281 +29,131 @@ class WhiteboardScreen extends StatefulWidget {
 }
 
 class WhiteboardScreenState extends State<WhiteboardScreen> {
-  final TransformationController _transformationController = TransformationController();
-  List<WhiteboardObject> _objects = [];
-  final GlobalKey _whiteboardKey = GlobalKey();
-  bool _isEraserSelected = false;
-  bool _isCrayonSelected = false;
-  WhiteboardObject? _selectedObject;
-  List<List<Offset>> _crayonDrawings = [];
-
-  @override
-  void dispose() {
-    _transformationController.dispose();
-    super.dispose();
-  }
-
-  void _handleDrop(BuildContext context, DragTargetDetails<WhiteboardObject> details) {
-    final RenderBox renderBox = _whiteboardKey.currentContext!.findRenderObject() as RenderBox;
-    final Offset localPosition = renderBox.globalToLocal(details.offset);
-
-    setState(() {
-      _objects.add(
-        WhiteboardObject(
-          position: localPosition,
-          color: details.data.color,
-          shape: details.data.shape,
-          isResizable: details.data.isResizable,
-        ),
-      );
-    });
-  }
-
-  void _handleTap(Offset position) {
-    if (_isEraserSelected) {
-      setState(() {
-        _objects.removeWhere((object) {
-          final rect = object.shape == BoxShape.circle
-              ? Rect.fromCircle(center: object.position, radius: 15)
-              : Rect.fromCenter(center: object.position, width: object.isResizable ? object.width : 30, height: object.isResizable ? object.height : 30);
-          return rect.contains(position);
-        });
-      });
-    } else if (_isCrayonSelected) {
-      setState(() {
-        if (_crayonDrawings.isEmpty || _crayonDrawings.last.isNotEmpty) {
-          _crayonDrawings.add([]);
-        }
-        _crayonDrawings.last.add(position);
-      });
-    } else {
-      bool objectTapped = false;
-      for (int i = 0; i < _objects.length; i++) {
-        final object = _objects[i];
-        final rect = object.shape == BoxShape.circle
-            ? Rect.fromCircle(center: object.position, radius: 15)
-            : Rect.fromCenter(center: object.position, width: object.isResizable ? object.width : 30, height: object.isResizable ? object.height : 30);
-        if (rect.contains(position)) {
-          setState(() {
-            _objects[i].isSelected = !_objects[i].isSelected;
-            _selectedObject = _objects[i].isSelected ? _objects[i] : null;
-          });
-          objectTapped = true;
-          break;
-        }
-      }
-      if (!objectTapped) {
-        setState(() {
-          for (final object in _objects) {
-            object.isSelected = false;
-          }
-          _selectedObject = null;
-        });
-      }
-    }
-  }
-
-  void _handlePanUpdate(DragUpdateDetails details) {
-    if (_selectedObject != null) {
-      setState(() {
-        _selectedObject!.position += Offset(details.delta.dx, 0); // Only horizontal movement
-      });
-    } else if (_isCrayonSelected) {
-      setState(() {
-        if (_crayonDrawings.isEmpty || _crayonDrawings.last.isEmpty) {
-          _crayonDrawings.add([]);
-        }
-        _crayonDrawings.last.add(details.localPosition);
-      });
-    }
-  }
+  List<String> levels = [
+    'Start',
+    'Level-1',
+    'Level-2',
+    'Level-3',
+    'Level-4',
+    'Level-5'
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
-            child: DragTarget<WhiteboardObject>(
-              onAcceptWithDetails: (details) => _handleDrop(context, details),
-              builder: (context, candidateData, rejectedData) {
-                return InteractiveViewer(
-                  transformationController: _transformationController,
-                  constrained: false,
-                  boundaryMargin: const EdgeInsets.symmetric(horizontal: 100),
-                  minScale: 0.5,
-                  maxScale: 3.0,
-                  child: Container(
-                    key: _whiteboardKey,
-                    width: MediaQuery.of(context).size.width,
-                    height: MediaQuery.of(context).size.height,
-                    color: Colors.white,
-                    child: GestureDetector(
-                      onTapDown: (details) => _handleTap(details.localPosition),
-                      onPanUpdate: _handlePanUpdate,
-                      child: CustomPaint(
-                        painter: GridPainter(_objects, _crayonDrawings),
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: CustomPaint(
+              painter: DashLinePainter(),
+              child: GridView.builder(
+                itemCount: levels.length,
+                reverse: true,
+                shrinkWrap: true,
+                physics: const BouncingScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 1, childAspectRatio: 2),
+                itemBuilder: (BuildContext context, int index) {
+                  return Row(
+                    mainAxisAlignment: (index % 2 == 0)
+                        ? MainAxisAlignment.start
+                        : MainAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 25),
+                        child: Container(
+                          height: 125,
+                          width: 125,
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(62.5),
+                          ),
+                          child: Center(
+                            child: Container(
+                              height: 110,
+                              width: 110,
+                              decoration: BoxDecoration(
+                                color: (index == 0)
+                                    ? Colors.green
+                                    : Colors.amberAccent,
+                                borderRadius: BorderRadius.circular(55),
+                              ),
+                              child: Center(
+                                child: Text(levels[index],
+                                    style: const TextStyle(
+                                        fontSize: 16, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Container(
-              width: 100,
-              color: Colors.grey[300],
-              child: Column(
-                children: [
-                  Draggable<WhiteboardObject>(
-                    data: WhiteboardObject(color: Colors.red, shape: BoxShape.circle),
-                    feedback: _buildDraggableItem(Colors.red, BoxShape.circle),
-                    child: _buildDraggableItem(Colors.red, BoxShape.circle),
-                  ),
-                  Draggable<WhiteboardObject>(
-                    data: WhiteboardObject(color: Colors.blue, shape: BoxShape.rectangle),
-                    feedback: _buildDraggableItem(Colors.blue, BoxShape.rectangle),
-                    child: _buildDraggableItem(Colors.blue, BoxShape.rectangle),
-                  ),
-                  Draggable<WhiteboardObject>(
-                    data: WhiteboardObject(color: Colors.green, shape: BoxShape.circle),
-                    feedback: _buildDraggableItem(Colors.green, BoxShape.circle),
-                    child: _buildDraggableItem(Colors.green, BoxShape.circle),
-                  ),
-                  Draggable<WhiteboardObject>(
-                    data: WhiteboardObject(color: Colors.blue.withOpacity(0.5), shape: BoxShape.rectangle, isResizable: true),
-                    feedback: _buildDraggableItem(Colors.blue.withOpacity(0.5), BoxShape.rectangle, isResizable: true),
-                    child: _buildDraggableItem(Colors.blue.withOpacity(0.5), BoxShape.rectangle, isResizable: true),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isEraserSelected = !_isEraserSelected;
-                        _isCrayonSelected = false;
-                      });
-                    },
-                    child: _buildDraggableItem(Colors.white, BoxShape.rectangle, isResizable: false),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (_isCrayonSelected) {
-                          _crayonDrawings.add([]);
-                        }
-                        _isCrayonSelected = !_isCrayonSelected;
-                        _isEraserSelected = false;
-                      });
-                    },
-                    child: _buildDraggableItem(Colors.orange, BoxShape.rectangle, isResizable: false),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
-          ),
+          )
         ],
       ),
+      
     );
+    
   }
-
-  Widget _buildDraggableItem(Color color, BoxShape shape, {bool isResizable = false}) {
-    return Container(
-      width: 30,
-      height: 30,
-      decoration: BoxDecoration(
-        color: color,
-        shape: shape,
-        border: isResizable ? Border.all(color: Colors.black) : null,
-      ),
-    );
-  }
+  
 }
 
-class WhiteboardObject {
-  Offset position;
-  Color color;
-  BoxShape shape;
-  bool isResizable;
-  double width;
-  double height;
-  bool isSelected;
-
-  WhiteboardObject({
-    this.position = Offset.zero,
-    this.isSelected = false,
-    required this.color,
-    this.shape = BoxShape.circle,
-    this.isResizable = false,
-    this.width = 100,
-    this.height = 50,
-  });
-}
-
-class GridPainter extends CustomPainter {
-  final List<WhiteboardObject> objects;
-  final List<List<Offset>> crayonDrawings;
-  GridPainter(this.objects, this.crayonDrawings);
+class DashLinePainter extends CustomPainter {
+  final Paint _paint = Paint()
+    ..color = Colors.black
+    ..strokeWidth = 4.0
+    ..style = PaintingStyle.stroke
+    ..strokeJoin = StrokeJoin.round;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.grey
-      ..strokeWidth = 1;
+    var path = Path()
+      ..moveTo(size.width / 4.5, size.height / 1.09)
+      ..lineTo(size.width / 4.5, size.height / 1.28)
+      ..arcToPoint(Offset(size.width / 3.2, size.height / 1.33),
+          radius: const Radius.circular(50), clockwise: true)
+      ..lineTo(size.width / 1.3, size.height / 1.33)
+      ..lineTo(size.width / 1.3, size.height / 1.62)
+      ..arcToPoint(Offset(size.width / 1.5, size.height / 1.72),
+          radius: const Radius.circular(50), clockwise: false)
+      ..lineTo(size.width / 4.5, size.height / 1.72)
+      ..lineTo(size.width / 4.5, size.height / 2.2)
+      ..arcToPoint(Offset(size.width / 3, size.height / 2.4),
+          radius: const Radius.circular(50), clockwise: true)
+      ..lineTo(size.width / 1.3, size.height / 2.4)
+      ..lineTo(size.width / 1.3, size.height / 3.5)
+      ..arcToPoint(Offset(size.width / 1.45, size.height / 4),
+          radius: const Radius.circular(50), clockwise: false)
+      ..lineTo(size.width / 4.5, size.height / 4)
+      ..lineTo(size.width / 4.5, size.height / 8.5)
+      ..arcToPoint(Offset(size.width / 3.2, size.height / 11),
+          radius: const Radius.circular(50), clockwise: true)
+      ..lineTo(size.width / 1.3, size.height / 11);
 
-    for (double i = 0; i <= size.width; i += 50) {
-      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
-    }
+    Path dashPath = Path();
 
-    for (double i = 0; i <= size.height; i += 50) {
-      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
-    }
+    double dashWidth = 10.0;
+    double dashSpace = 5.0;
+    double distance = 0.0;
 
-    for (final object in objects) {
-      final objectPaint = Paint()..color = object.color;
-      if (object.shape == BoxShape.circle) {
-        canvas.drawCircle(object.position, 15, objectPaint);
-      } else if (object.shape == BoxShape.rectangle) {
-        if (object.isResizable) {
-          final rect = Rect.fromCenter(center: object.position, width: object.width, height: object.height);
-          canvas.drawRect(rect, Paint()..color = Colors.white); // Fondo blanco
-          canvas.drawRect(rect, Paint()
-            ..color = Colors.blue.withOpacity(0.5)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2);
-          if (object.isSelected) {
-            canvas.drawRect(rect, Paint()
-              ..color = Colors.black
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2);
-          }
-        } else {
-          final rect = Rect.fromCenter(center: object.position, width: 30, height: 30);
-          canvas.drawRect(rect, objectPaint);
-          if (object.isSelected) {
-            canvas.drawRect(rect, Paint()
-              ..color = Colors.black
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2);
-          }
-        }
+    for (PathMetric pathMetric in path.computeMetrics()) {
+      while (distance < pathMetric.length) {
+        dashPath.addPath(
+          pathMetric.extractPath(distance, distance + dashWidth),
+          Offset.zero,
+        );
+        distance += dashWidth;
+        distance += dashSpace;
       }
     }
-
-    final crayonPaint = Paint()
-      ..color = Colors.orange
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-
-    for (final drawing in crayonDrawings) {
-      for (int i = 0; i < drawing.length - 1; i++) {
-        canvas.drawLine(drawing[i], drawing[i + 1], crayonPaint);
-      }
-    }
+    canvas.drawPath(dashPath, _paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(DashLinePainter oldDelegate) => true;
 }
